@@ -40,6 +40,9 @@ fn main() {
                 if !out.stderr.is_empty() {
                     println!("--- Python Error ---\n{}", String::from_utf8_lossy(&out.stderr));
                 }
+                if out.status.code().unwrap_or(0) != 0 {
+                    println!("\n[Note] Interactive input (input()) is not supported in this compiler run. Please use hardcoded values for input or run the generated Python file manually in a terminal.");
+                }
                 println!("--- End ---");
             }
             Err(e) => {
