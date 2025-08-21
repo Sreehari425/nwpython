@@ -3,6 +3,11 @@ def add(a, b) {
     return a + b;
 }
 
+/*
+this is multi line comment
+*/
+
+
 # main function to execute the code
 def main() {
     print("Hello, World!");

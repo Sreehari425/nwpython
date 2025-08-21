@@ -14,6 +14,8 @@ pub fn tokenize(source: &str) -> Vec<Token> {
     let src = source.replace("\r\n", "\n").replace("\r", "\n");
     let mut tokens = Vec::new();
     let mut buf = String::new();
+    let mut in_multiline_comment = false;
+    let mut multiline_comment = String::new();
 
     fn flush_buf(buf: &mut String, tokens: &mut Vec<Token>) {
         if !buf.is_empty() {
@@ -22,7 +24,8 @@ pub fn tokenize(source: &str) -> Vec<Token> {
         }
     }
 
-    for line in src.lines() {
+    let mut lines = src.lines();
+    while let Some(line) = lines.next() {
         let mut comment_start = None;
         let chars: Vec<char> = line.chars().collect();
         let mut i = 0;
@@ -30,6 +33,20 @@ pub fn tokenize(source: &str) -> Vec<Token> {
         let mut in_double = false;
         while i < chars.len() {
             let ch = chars[i];
+            if in_multiline_comment {
+                if ch == '*' && i + 1 < chars.len() && chars[i + 1] == '/' {
+                    multiline_comment.push_str("*/");
+                    tokens.push(Token::Comment(multiline_comment.trim().to_string()));
+                    multiline_comment.clear();
+                    in_multiline_comment = false;
+                    i += 2;
+                    continue;
+                } else {
+                    multiline_comment.push(ch);
+                    i += 1;
+                    continue;
+                }
+            }
             if ch == '\'' && !in_double {
                 in_single = !in_single;
             } else if ch == '"' && !in_single {
@@ -43,6 +60,12 @@ pub fn tokenize(source: &str) -> Vec<Token> {
                 if ch == '#' {
                     comment_start = Some(i);
                     break;
+                }
+                if ch == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
+                    in_multiline_comment = true;
+                    multiline_comment.push_str("/*");
+                    i += 2;
+                    continue;
                 }
                 if ch == '{' {
                     flush_buf(&mut buf, &mut tokens);
@@ -70,6 +93,10 @@ pub fn tokenize(source: &str) -> Vec<Token> {
         if let Some(idx) = comment_start {
             let comment = &line[idx..];
             tokens.push(Token::Comment(comment.trim().to_string()));
+        }
+        // If still in multiline comment, add newline
+        if in_multiline_comment {
+            multiline_comment.push('\n');
         }
     }
     flush_buf(&mut buf, &mut tokens);

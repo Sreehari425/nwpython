@@ -16,7 +16,15 @@ pub fn transpile(tokens: &[Token]) -> String {
     while i < tokens.len() {
         match &tokens[i] {
             Token::Comment(c) => {
-                out_lines.push(format!("{}# {}", "    ".repeat(indent), c.trim_start_matches(['/', '#', ' '])));
+                let c = c.trim_start_matches(['/', '#', ' ']);
+                if c.starts_with("*") {
+                    // Multi-line comment: /* ... */
+                    let content = c.trim_start_matches('*').trim_start_matches('/').trim_end_matches("*/").trim();
+                    out_lines.push(format!("{}\"\"\"{}\"\"\"", "    ".repeat(indent), content));
+                } else {
+                    // Single-line comment
+                    out_lines.push(format!("{}# {}", "    ".repeat(indent), c));
+                }
             }
             Token::Text(s) => {
                 stmt_buf.push_str(s);
