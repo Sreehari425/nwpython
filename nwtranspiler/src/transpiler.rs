@@ -27,7 +27,18 @@ pub fn transpile(tokens: &[Token]) -> String {
                 }
             }
             Token::Text(s) => {
-                stmt_buf.push_str(s);
+                let mut line = s.to_string();
+                // Handle return x++ and return x--
+                let re_ret_inc = regex::Regex::new(r"return\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\+\+").unwrap();
+                let re_ret_dec = regex::Regex::new(r"return\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*--").unwrap();
+                line = re_ret_inc.replace_all(&line, "return $1 + 1").to_string();
+                line = re_ret_dec.replace_all(&line, "return $1 - 1").to_string();
+                // Handle x++ and x-- (not in return)
+                let re_inc = regex::Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\+\+").unwrap();
+                let re_dec = regex::Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*--").unwrap();
+                line = re_inc.replace_all(&line, "$1 += 1").to_string();
+                line = re_dec.replace_all(&line, "$1 -= 1").to_string();
+                stmt_buf.push_str(&line);
             }
             Token::LBrace => {
                 let header = stmt_buf.trim().to_string();
