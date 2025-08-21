@@ -1,0 +1,15 @@
+// defines a function
+def add(a, b) {
+    return a + b;
+}
+
+# main function to execute the code
+def main() {
+    print("Hello, World!");
+    print(add(5, 10));
+}
+
+
+if (__name__ == "__main__") {
+    main();
+}
