@@ -6,10 +6,15 @@ pub fn transpile(tokens: &[Token]) -> String {
     let mut indent = 0;
     let mut stmt_buf = String::new();
     let block_headers = ["if ", "elif ", "else", "def ", "while ", "for "];
+    let mut block_stack: Vec<&str> = Vec::new(); // Track what kind of blocks we're in
 
     fn header_needs_colon(s: &str, block_headers: &[&str]) -> bool {
         let s = s.trim();
         block_headers.iter().any(|h| s.starts_with(h))
+    }
+
+    fn is_function_header(s: &str) -> bool {
+        s.trim().starts_with("def ")
     }
 
     let mut i = 0;
@@ -101,27 +106,60 @@ pub fn transpile(tokens: &[Token]) -> String {
                 if header.is_empty() {
                     out_lines.push("# ERROR: Found '{' without header".to_string());
                 } else {
-                    let mut line = header;
+                    let mut line = header.clone();
                     if !line.ends_with(':') {
                         line.push(':');
                     }
                     out_lines.push(format!("{}{}", "    ".repeat(indent), line));
+                    
+                    // Track what kind of block we're entering
+                    if is_function_header(&header) {
+                        block_stack.push("function");
+                    } else {
+                        block_stack.push("control");
+                    }
+                    
                     indent += 1;
                 }
             }
             Token::RBrace => {
                 let simple = stmt_buf.trim().to_string();
+                let in_function_context = block_stack.contains(&"function");
+                
                 if !simple.is_empty() {
-                    for stmt in simple.split(';') {
+                    let statements: Vec<&str> = simple.split(';').collect();
+                    for (idx, stmt) in statements.iter().enumerate() {
                         let s = stmt.trim();
                         if !s.is_empty() {
-                            out_lines.push(format!("{}{}", "    ".repeat(indent), s));
+                            // Handle 'let' keyword conversion to standard variable assignment
+                            let s = if s.starts_with("let ") {
+                                &s[4..] // Remove 'let ' prefix
+                            } else {
+                                s
+                            };
+                            
+                            // Check if this is the last statement and we should auto-return
+                            let should_auto_return = in_function_context && 
+                                                   idx == statements.len() - 1 && 
+                                                   !s.starts_with("return ") && 
+                                                   !s.trim().is_empty() &&
+                                                   !s.starts_with("print(") &&
+                                                   !s.starts_with("print ");
+                            
+                            if should_auto_return {
+                                // Auto-return: add return prefix to the last expression
+                                out_lines.push(format!("{}return {}", "    ".repeat(indent), s));
+                            } else {
+                                out_lines.push(format!("{}{}", "    ".repeat(indent), s));
+                            }
                         }
                     }
                     stmt_buf.clear();
                 }
+                
                 if indent > 0 {
                     indent -= 1;
+                    block_stack.pop();
                 } else {
                     out_lines.push("# ERROR: Too many '}'".to_string());
                 }
@@ -132,12 +170,27 @@ pub fn transpile(tokens: &[Token]) -> String {
                 for s in stmt.split(';') {
                     let s = s.trim();
                     if !s.is_empty() {
+                        // Handle 'let' keyword conversion
+                        let s = if s.starts_with("let ") {
+                            &s[4..]
+                        } else {
+                            s
+                        };
+                        
                         if header_needs_colon(s, &block_headers) {
                             let mut line = s.to_string();
                             if !line.ends_with(':') {
                                 line.push(':');
                             }
                             out_lines.push(format!("{}{}", "    ".repeat(indent), line));
+                            
+                            // Track what kind of block we're entering
+                            if is_function_header(s) {
+                                block_stack.push("function");
+                            } else {
+                                block_stack.push("control");
+                            }
+                            
                             indent += 1;
                         } else {
                             out_lines.push(format!("{}{}", "    ".repeat(indent), s));
@@ -153,6 +206,13 @@ pub fn transpile(tokens: &[Token]) -> String {
         for s in tail.split(';') {
             let s = s.trim();
             if !s.is_empty() {
+                // Handle 'let' keyword conversion
+                let s = if s.starts_with("let ") {
+                    &s[4..]
+                } else {
+                    s
+                };
+                
                 if header_needs_colon(s, &block_headers) {
                     let mut line = s.to_string();
                     if !line.ends_with(':') {
