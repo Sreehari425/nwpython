@@ -15,7 +15,7 @@ A curly-brace, semicolon-terminated Python-like language with C-style operators,
 
 ### Input (main.nwpy)
 
-```nwpy
+```py
 // Find factorial using recursion
 def factorial(n: int) {
     if (n == 0) {
