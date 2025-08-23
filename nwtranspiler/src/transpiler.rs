@@ -96,16 +96,38 @@ pub fn transpile(tokens: &[Token]) -> String {
                         let re_dec = regex::Regex::new(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*--").unwrap();
                         line = re_inc.replace_all(&line, "$1 += 1").to_string();
                         line = re_dec.replace_all(&line, "$1 -= 1").to_string();
+                        
+                        // Fix dictionary iteration: .values -> .items() for key,value pairs
+                        if line.contains("for ") && line.contains(" in ") && line.contains(".values") {
+                            line = line.replace(".values", ".items()");
+                        }
+                        
                         stmt_buf.push_str(&line);
                     }
                 }
             }
             Token::LBrace => {
                 let header = stmt_buf.trim().to_string();
-                stmt_buf.clear();
-                if header.is_empty() {
-                    out_lines.push("# ERROR: Found '{' without header".to_string());
+                
+                // Check if this is a dictionary literal by analyzing the context
+                let is_dictionary = if header.is_empty() {
+                    // Empty header could be a standalone dictionary
+                    true
+                } else if header.contains('=') {
+                    // Contains assignment, likely: var = {
+                    let after_equals = header.split('=').last().unwrap_or("").trim();
+                    after_equals.is_empty() || !header_needs_colon(&header, &block_headers)
                 } else {
+                    // Check if this is a control structure that needs a colon
+                    !header_needs_colon(&header, &block_headers)
+                };
+                
+                if is_dictionary {
+                    // This is a dictionary literal, keep the brace as part of the statement
+                    stmt_buf.push('{');
+                } else {
+                    // This is a code block
+                    stmt_buf.clear();
                     let mut line = header.clone();
                     if !line.ends_with(':') {
                         line.push(':');
@@ -123,45 +145,61 @@ pub fn transpile(tokens: &[Token]) -> String {
                 }
             }
             Token::RBrace => {
-                let simple = stmt_buf.trim().to_string();
-                let in_function_context = block_stack.contains(&"function");
+                // Check if we're in a dictionary context by looking at the statement buffer
+                let current_stmt = stmt_buf.trim();
+                let in_dictionary = current_stmt.contains('{') || 
+                                  current_stmt.contains(':') && !current_stmt.starts_with("if ") && 
+                                  !current_stmt.starts_with("elif ") && 
+                                  !current_stmt.starts_with("else") && 
+                                  !current_stmt.starts_with("def ") && 
+                                  !current_stmt.starts_with("while ") && 
+                                  !current_stmt.starts_with("for ");
                 
-                if !simple.is_empty() {
-                    let statements: Vec<&str> = simple.split(';').collect();
-                    for (idx, stmt) in statements.iter().enumerate() {
-                        let s = stmt.trim();
-                        if !s.is_empty() {
-                            // Handle 'let' keyword conversion to standard variable assignment
-                            let s = if s.starts_with("let ") {
-                                &s[4..] // Remove 'let ' prefix
-                            } else {
-                                s
-                            };
-                            
-                            // Check if this is the last statement and we should auto-return
-                            let should_auto_return = in_function_context && 
-                                                   idx == statements.len() - 1 && 
-                                                   !s.starts_with("return ") && 
-                                                   !s.trim().is_empty() &&
-                                                   !s.starts_with("print(") &&
-                                                   !s.starts_with("print ");
-                            
-                            if should_auto_return {
-                                // Auto-return: add return prefix to the last expression
-                                out_lines.push(format!("{}return {}", "    ".repeat(indent), s));
-                            } else {
-                                out_lines.push(format!("{}{}", "    ".repeat(indent), s));
+                if in_dictionary {
+                    // This is closing a dictionary literal
+                    stmt_buf.push('}');
+                } else {
+                    // This is closing a code block
+                    let simple = stmt_buf.trim().to_string();
+                    let in_function_context = block_stack.contains(&"function");
+                    
+                    if !simple.is_empty() {
+                        let statements: Vec<&str> = simple.split(';').collect();
+                        for (idx, stmt) in statements.iter().enumerate() {
+                            let s = stmt.trim();
+                            if !s.is_empty() {
+                                // Handle 'let' keyword conversion to standard variable assignment
+                                let s = if s.starts_with("let ") {
+                                    &s[4..] // Remove 'let ' prefix
+                                } else {
+                                    s
+                                };
+                                
+                                // Check if this is the last statement and we should auto-return
+                                let should_auto_return = in_function_context && 
+                                                       idx == statements.len() - 1 && 
+                                                       !s.starts_with("return ") && 
+                                                       !s.trim().is_empty() &&
+                                                       !s.starts_with("print(") &&
+                                                       !s.starts_with("print ");
+                                
+                                if should_auto_return {
+                                    // Auto-return: add return prefix to the last expression
+                                    out_lines.push(format!("{}return {}", "    ".repeat(indent), s));
+                                } else {
+                                    out_lines.push(format!("{}{}", "    ".repeat(indent), s));
+                                }
                             }
                         }
+                        stmt_buf.clear();
                     }
-                    stmt_buf.clear();
-                }
-                
-                if indent > 0 {
-                    indent -= 1;
-                    block_stack.pop();
-                } else {
-                    out_lines.push("# ERROR: Too many '}'".to_string());
+                    
+                    if indent > 0 {
+                        indent -= 1;
+                        block_stack.pop();
+                    } else {
+                        out_lines.push("# ERROR: Too many '}'".to_string());
+                    }
                 }
             }
             Token::Semicolon => {
