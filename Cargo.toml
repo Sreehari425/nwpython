@@ -1,4 +1,10 @@
+
 [workspace]
-members = ["nwparser", "nwtranspiler", "nwcli"]
+members = [
+	"nwparser",
+	"nwtranspiler",
+	"nwcli",
+	"nwformatter"
+]
 resolver = "2"
 
