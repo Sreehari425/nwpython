@@ -215,12 +215,12 @@ pub fn transpile(tokens: &[Token]) -> String {
                             let s = stmt.trim();
                             if !s.is_empty() {
                                 // Handle 'let' keyword conversion to standard variable assignment
-                                let s = if s.starts_with("let ") {
-                                    &s[4..] // Remove 'let ' prefix
+
+                                let s = if let Some(stripped) = s.strip_prefix("let ") {
+                                    stripped
                                 } else {
                                     s
                                 };
-
                                 // Check if this is the last statement and we should auto-return
                                 let should_auto_return = in_function_context
                                     && idx == statements.len() - 1
@@ -258,9 +258,11 @@ pub fn transpile(tokens: &[Token]) -> String {
                 for s in stmt.split(';') {
                     let s = s.trim();
                     if !s.is_empty() {
-                        // Handle 'let' keyword conversion
-                        let s = if s.starts_with("let ") { &s[4..] } else { s };
-
+                        let s = if let Some(stripped) = s.strip_prefix("let ") {
+                            stripped
+                        } else {
+                            s
+                        };
                         if header_needs_colon(s, &block_headers) {
                             let mut line = s.to_string();
                             if !line.ends_with(':') {
@@ -290,8 +292,11 @@ pub fn transpile(tokens: &[Token]) -> String {
         for s in tail.split(';') {
             let s = s.trim();
             if !s.is_empty() {
-                // Handle 'let' keyword conversion
-                let s = if s.starts_with("let ") { &s[4..] } else { s };
+                let s = if let Some(stripped) = s.strip_prefix("let ") {
+                    stripped
+                } else {
+                    s
+                };
 
                 if header_needs_colon(s, &block_headers) {
                     let mut line = s.to_string();

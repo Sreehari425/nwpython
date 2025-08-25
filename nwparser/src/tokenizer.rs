@@ -24,8 +24,8 @@ pub fn tokenize(source: &str) -> Vec<Token> {
         }
     }
 
-    let mut lines = src.lines();
-    while let Some(line) = lines.next() {
+    let lines = src.lines();
+    for line in lines {
         let mut comment_start = None;
         let chars: Vec<char> = line.chars().collect();
         let mut i = 0;
@@ -100,11 +100,14 @@ pub fn tokenize(source: &str) -> Vec<Token> {
         }
     }
     flush_buf(&mut buf, &mut tokens);
-    tokens.into_iter().filter(|t| match t {
-        Token::Text(s) => !s.trim().is_empty(),
-        Token::Comment(s) => !s.trim().is_empty(),
-        _ => true
-    }).collect()
+    tokens
+        .into_iter()
+        .filter(|t| match t {
+            Token::Text(s) => !s.trim().is_empty(),
+            Token::Comment(s) => !s.trim().is_empty(),
+            _ => true,
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -114,12 +117,15 @@ mod tests {
     fn test_tokenize_basic() {
         let src = "def add(a, b) { return a + b; }";
         let tokens = tokenize(src);
-        assert_eq!(tokens, vec![
-            Token::Text("def add(a, b) ".to_string()),
-            Token::LBrace,
-            Token::Text(" return a + b".to_string()),
-            Token::Semicolon,
-            Token::RBrace,
-        ]);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Text("def add(a, b) ".to_string()),
+                Token::LBrace,
+                Token::Text(" return a + b".to_string()),
+                Token::Semicolon,
+                Token::RBrace,
+            ]
+        );
     }
 }
