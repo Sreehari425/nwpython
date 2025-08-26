@@ -1,6 +1,7 @@
 # NWPython
 
 A curly-brace, semicolon-terminated Python-like language with C-style operators, transpiled to Python using Rust.
+> **Status:** 🚧 **Hobby / Learning Project** — this is experimental, not production-ready. Expect rough edges, breaking changes, and incomplete features. I’m building this for fun and to learn about language design and Rust.
 
 ## Features
 
