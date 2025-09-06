@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 nwparser = { path = "../nwparser" }
 nwtranspiler = { path = "../nwtranspiler" }
+nwformatter = { path = "../nwformatter" }

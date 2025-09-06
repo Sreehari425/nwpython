@@ -5,11 +5,14 @@ use std::process;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: nwcli <source.nwpy|source.py> [--run] [--reverse-transpile]");
+        eprintln!("Usage: nwcli <source.nwpy|source.py> [--run] [--reverse-transpile] [--format] [--in-place]");
         process::exit(1);
     }
     let filename = &args[1];
     let run_flag = args.iter().any(|a| a == "--run");
+    let reverse_flag = args.iter().any(|a| a == "--reverse-transpile");
+    let format_flag = args.iter().any(|a| a == "--format");
+    let in_place_flag = args.iter().any(|a| a == "--in-place");
     let source = match fs::read_to_string(filename) {
         Ok(s) => s,
         Err(e) => {
@@ -17,14 +20,47 @@ fn main() {
             process::exit(1);
         }
     };
+    let is_py_input = filename.ends_with(".py");
+
+    // Formatter-only mode: format NWPython source and print or write
+    if format_flag && !is_py_input && !reverse_flag {
+        let formatted = nwformatter::format_nwpython(&source);
+        if in_place_flag {
+            if let Err(e) = fs::write(filename, &formatted) {
+                eprintln!("Error writing formatted file: {}", e);
+                process::exit(1);
+            }
+        }
+        println!("{}", formatted);
+        return;
+    }
+
+    if reverse_flag || is_py_input {
+        // Reverse transpile Python -> NWPython
+        let mut nw_code = nwtranspiler::reverse_transpiler::reverse_transpile(&source);
+        if format_flag {
+            nw_code = nwformatter::format_nwpython(&nw_code);
+        }
+        println!("{}", nw_code);
+        // Save as .nwpy next to input
+        let nw_path = if let Some(pos) = filename.rfind('.') {
+            format!("{}{}.nwpy", &filename[..pos], "")
+        } else {
+            format!("{}.nwpy", filename)
+        };
+        if let Err(e) = fs::write(&nw_path, &nw_code) {
+            eprintln!("Error writing NWPython file: {}", e);
+            process::exit(1);
+        }
+        // Don't run reverse-transpiled code
+        return;
+    }
+
+    // Regular transpile: NWPython -> Python
     let tokens = nwparser::tokenize(&source);
     let py = nwtranspiler::transpile(&tokens);
-    eprintln!(
-        "{}",
-        nwtranspiler::reverse_transpiler::reverse_transpile(&py)
-    );
     println!("{}", py);
-    // Write to a .py fileconvert_python_line with the same base name as the input file
+    // Write to a .py file with the same base name as the input file
     let py_path = if let Some(pos) = filename.rfind('.') {
         format!("{}{}.py", &filename[..pos], "")
     } else {
@@ -35,7 +71,6 @@ fn main() {
         process::exit(1);
     }
     if run_flag {
-        // Todo : this as of current state works on systems which have python3 as alis , will fix
         let output = process::Command::new("python3").arg(&py_path).output();
         match output {
             Ok(out) => {
