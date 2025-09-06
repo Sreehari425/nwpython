@@ -4,8 +4,14 @@ use std::process;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    // Help flag handling
+    let help_flag = args.iter().any(|a| a == "-h" || a == "--help");
+    if help_flag {
+        print_help();
+        return;
+    }
     if args.len() < 2 {
-        eprintln!("Usage: nwcli <source.nwpy|source.py> [--run] [--reverse-transpile] [--format] [--in-place]");
+        print_help();
         process::exit(1);
     }
     let filename = &args[1];
@@ -97,4 +103,19 @@ fn main() {
             }
         }
     }
+}
+
+fn print_help() {
+    println!("nwcli — NWPython toolchain CLI\n");
+    println!("Usage: nwcli <source.nwpy|source.py> [options]");
+    println!("Options:");
+    println!("  -h, --help                Show this help message and exit");
+    println!("      --run                 After transpiling NWPython -> Python, run the generated Python");
+    println!("      --reverse-transpile   Convert Python -> NWPython (saves .nwpy next to input)");
+    println!("      --format              Run the NWPython formatter on reverse-transpile output or on .nwpy input");
+    println!("      --in-place            When used with --format, overwrite the input file with formatted output");
+    println!("\nExamples:");
+    println!("  nwcli source.nwpy           # transpile to Python and write source.py");
+    println!("  nwcli source.nwpy --run     # transpile and run the generated Python");
+    println!("  nwcli main.py --reverse-transpile --format  # produce formatted main.nwpy");
 }
